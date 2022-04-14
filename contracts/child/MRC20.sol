@@ -8,11 +8,14 @@ import "./BaseERC20NoSig.sol";
  * @dev ERC20 methods have been made payable while keeping their method signature same as other ChildERC20s on Matic
  */
 contract MRC20 is BaseERC20NoSig {
+    event Approval(address indexed owner, address indexed spender, uint256 value);
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     uint256 public currentSupply = 0;
     uint8 private constant DECIMALS = 18;
     bool isInitialized;
+
+    mapping(address => mapping(address => amount)) private allowances;
 
     constructor() public {}
 
@@ -85,6 +88,16 @@ contract MRC20 is BaseERC20NoSig {
         return account.balance;
     }
 
+    function allowance(address owner, address spender) public view returns(uint256) {
+        return allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) public returns(bool) {
+        allowances[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
     /// @dev Function that is called when a user or another contract wants to transfer funds.
     /// @param to Address of token receiver.
     /// @param value Number of tokens to transfer.
@@ -106,5 +119,16 @@ contract MRC20 is BaseERC20NoSig {
         require(recipient != address(this), "can't send to MRC20");
         address(uint160(recipient)).transfer(amount);
         emit Transfer(sender, recipient, amount);
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public returns(bool) {
+        require(msg.sender == from || allowances[from][msg.sender] >= amount, "unauthorized");
+        require(from.balance >= amount, "insufficient MATIC");
+
+        if(msg.sender != from) allowances[from][msg.sender] -= amount;
+        to.transfer(amount);
+        emit Transfer(from, to, amount);
+
+        return true;
     }
 }
